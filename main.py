@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from rembg import remove
 import io
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -97,15 +98,22 @@ async def get_docs():
 # This is important for Render deployment
 if __name__ == "__main__":
     import uvicorn
-    import os
     
+    # Get port from environment (Render provides this)
     port = int(os.environ.get("PORT", 8000))
-    host = os.environ.get("HOST", "0.0.0.0")
+    host = "0.0.0.0"
     
     logger.info(f"Starting server on {host}:{port}")
-    uvicorn.run(
-        "main:app",
-        host=host,
-        port=port,
-        log_level="info"
-    )
+    logger.info(f"Environment PORT: {os.environ.get('PORT', 'Not set')}")
+    
+    try:
+        uvicorn.run(
+            app,  # Pass app object directly instead of string
+            host=host,
+            port=port,
+            log_level="info",
+            access_log=True
+        )
+    except Exception as e:
+        logger.error(f"Failed to start server: {e}")
+        raise
