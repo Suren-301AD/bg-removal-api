@@ -1,7 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from rembg import remove
 import io
 import logging
 import os
@@ -10,14 +9,14 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Create FastAPI app FIRST - before any heavy imports
 app = FastAPI(
     title="Background Removal API",
     description="API for removing backgrounds from images using AI",
     version="1.0.0"
 )
 
-# CORS middleware (from successful sign API pattern)
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,9 +25,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Lazy import for rembg
+_rembg_loaded = False
+_rembg_remove = None
+
+def get_rembg():
+    """Lazy load rembg to avoid startup delays"""
+    global _rembg_loaded, _rembg_remove
+    if not _rembg_loaded:
+        try:
+            logger.info("Loading rembg library...")
+            from rembg import remove as rembg_remove
+            _rembg_remove = rembg_remove
+            _rembg_loaded = True
+            logger.info("rembg loaded successfully")
+        except Exception as e:
+            logger.error(f"Failed to load rembg: {e}")
+            raise HTTPException(status_code=500, detail="Background removal service unavailable")
+    return _rembg_remove
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Background Removal API is starting up...")
+    # Don't load rembg here - do it on first use
 
 @app.get("/")
 async def root():
@@ -81,8 +100,11 @@ async def remove_background(file: UploadFile = File(...)):
     try:
         logger.info("Starting background removal process...")
         
+        # Get rembg function (lazy loaded)
+        rembg_remove = get_rembg()
+        
         # Process the image with rembg
-        output_bytes = remove(content)
+        output_bytes = rembg_remove(content)
         
         logger.info("Background removal completed successfully")
         
@@ -102,7 +124,7 @@ async def remove_background(file: UploadFile = File(...)):
             detail=f"Error processing image: {str(e)}"
         )
 
-# This matches the successful sign API startup pattern
+# Don't put anything heavy here - keep startup fast
 if __name__ == "__main__":
     import uvicorn
     
@@ -110,10 +132,9 @@ if __name__ == "__main__":
     host = "0.0.0.0"
     
     logger.info(f"Starting Background Removal API on {host}:{port}")
-    logger.info(f"Environment PORT: {os.environ.get('PORT', 'Not set')}")
     
     uvicorn.run(
-        app,  # Pass app directly when running as script
+        app,
         host=host,
         port=port,
         log_level="info"
