@@ -1,9 +1,11 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from rembg import remove
 import io
 import logging
 import os
+import uvicorn
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -16,6 +18,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# CORS middleware (from successful sign API pattern)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Background Removal API is starting up...")
@@ -26,7 +37,9 @@ async def root():
     return {
         "message": "Background Removal API is running!",
         "status": "healthy",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health"
     }
 
 @app.get("/health")
@@ -90,15 +103,8 @@ async def remove_background(file: UploadFile = File(...)):
             detail=f"Error processing image: {str(e)}"
         )
 
-@app.get("/docs")
-async def get_docs():
-    """Redirect to API documentation"""
-    return {"message": "Visit /docs for API documentation"}
-
-# This is important for Render deployment
+# This is the key pattern from your successful sign API
 if __name__ == "__main__":
-    import uvicorn
-    
     # Get port from environment (Render provides this)
     port = int(os.environ.get("PORT", 8000))
     host = "0.0.0.0"
@@ -108,7 +114,7 @@ if __name__ == "__main__":
     
     try:
         uvicorn.run(
-            app,  # Pass app object directly instead of string
+            app,  # Pass app object directly
             host=host,
             port=port,
             log_level="info",
