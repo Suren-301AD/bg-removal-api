@@ -113,7 +113,7 @@ if __name__ == "__main__":
     logger.info(f"Environment PORT: {os.environ.get('PORT', 'Not set')}")
     
     uvicorn.run(
-        "main:app",  # String reference like successful sign API
+        app,  # Pass app directly when running as script
         host=host,
         port=port,
         log_level="info"
