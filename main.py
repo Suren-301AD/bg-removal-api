@@ -5,7 +5,6 @@ from rembg import remove
 import io
 import logging
 import os
-import uvicorn
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -103,23 +102,19 @@ async def remove_background(file: UploadFile = File(...)):
             detail=f"Error processing image: {str(e)}"
         )
 
-# This is the key pattern from your successful sign API
+# This matches the successful sign API startup pattern
 if __name__ == "__main__":
-    # Get port from environment (Render provides this)
+    import uvicorn
+    
     port = int(os.environ.get("PORT", 8000))
     host = "0.0.0.0"
     
-    logger.info(f"Starting server on {host}:{port}")
+    logger.info(f"Starting Background Removal API on {host}:{port}")
     logger.info(f"Environment PORT: {os.environ.get('PORT', 'Not set')}")
     
-    try:
-        uvicorn.run(
-            app,  # Pass app object directly
-            host=host,
-            port=port,
-            log_level="info",
-            access_log=True
-        )
-    except Exception as e:
-        logger.error(f"Failed to start server: {e}")
-        raise
+    uvicorn.run(
+        "main:app",  # String reference like successful sign API
+        host=host,
+        port=port,
+        log_level="info"
+    )
