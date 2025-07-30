@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import io
 import logging
 import os
+from PIL import Image
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -103,8 +104,26 @@ async def remove_background(file: UploadFile = File(...)):
         # Get rembg function (lazy loaded)
         rembg_remove = get_rembg()
         
+        # Create BytesIO object and validate image
+        input_image = io.BytesIO(content)
+        
+        # Validate that the image can be opened with PIL
+        try:
+            with Image.open(input_image) as img:
+                logger.info(f"Image validated: {img.format}, {img.size}, {img.mode}")
+        except Exception as e:
+            logger.error(f"Invalid image file: {e}")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid image file. Please upload a valid image."
+            )
+        
+        # Reset BytesIO position for rembg processing
+        input_image.seek(0)
+        
         # Process the image with rembg
-        output_bytes = rembg_remove(content)
+        # Pass the BytesIO object directly to rembg
+        output_bytes = rembg_remove(input_image)
         
         logger.info("Background removal completed successfully")
         
@@ -117,6 +136,9 @@ async def remove_background(file: UploadFile = File(...)):
             }
         )
         
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"Error processing image: {str(e)}")
         raise HTTPException(
