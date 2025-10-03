@@ -10,7 +10,7 @@ from PIL import Image
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app FIRST - before any heavy imports
+# Create FastAPI app
 app = FastAPI(
     title="Background Removal API",
     description="API for removing backgrounds from images using AI",
@@ -48,7 +48,6 @@ def get_rembg():
 @app.on_event("startup")
 async def startup_event():
     logger.info("Background Removal API is starting up...")
-    # Don't load rembg here - do it on first use
 
 @app.get("/")
 async def root():
@@ -84,12 +83,12 @@ async def remove_background(file: UploadFile = File(...)):
             detail="File must be an image (JPG, PNG, etc.)"
         )
     
-    # Validate file size (10MB limit)
+    # Validate file size (50MB limit)
     content = await file.read()
-    if len(content) > 10 * 1024 * 1024:  # 10MB
+    if len(content) > 50 * 1024 * 1024:  # 50MB
         raise HTTPException(
             status_code=413, 
-            detail="File too large. Maximum size is 10MB"
+            detail="File too large. Maximum size is 50MB"
         )
     
     if len(content) == 0:
@@ -104,12 +103,9 @@ async def remove_background(file: UploadFile = File(...)):
         # Get rembg function (lazy loaded)
         rembg_remove = get_rembg()
         
-        # Create BytesIO object and validate image
-        input_image = io.BytesIO(content)
-        
-        # Validate that the image can be opened with PIL
+        # Validate image with PIL
         try:
-            with Image.open(input_image) as img:
+            with Image.open(io.BytesIO(content)) as img:
                 logger.info(f"Image validated: {img.format}, {img.size}, {img.mode}")
         except Exception as e:
             logger.error(f"Invalid image file: {e}")
@@ -118,12 +114,8 @@ async def remove_background(file: UploadFile = File(...)):
                 detail="Invalid image file. Please upload a valid image."
             )
         
-        # Reset BytesIO position for rembg processing
-        input_image.seek(0)
-        
-        # Process the image with rembg
-        # Pass the BytesIO object directly to rembg
-        output_bytes = rembg_remove(input_image)
+        # Process the image with rembg - force raw bytes
+        output_bytes = rembg_remove(content, force_return_bytes=True)
         
         logger.info("Background removal completed successfully")
         
@@ -146,7 +138,7 @@ async def remove_background(file: UploadFile = File(...)):
             detail=f"Error processing image: {str(e)}"
         )
 
-# Don't put anything heavy here - keep startup fast
+# Run the app directly
 if __name__ == "__main__":
     import uvicorn
     
